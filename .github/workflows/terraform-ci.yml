@@ -1,0 +1,32 @@
+name: Terraform CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write # required for OIDC
+
+jobs:
+  validate-plan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prd]
+    environment: ${{ matrix.env }}
+    defaults:
+      run:
+        working-directory: infra/foundation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+      - run: terraform fmt -check
+      - run: terraform init -input=false -backend-config=backends/${{ matrix.env }}.hcl
+      - run: terraform validate
+      - run: terraform plan -input=false -var-file=${{ matrix.env }}.tfvars
