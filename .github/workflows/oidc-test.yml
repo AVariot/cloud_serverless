@@ -1,0 +1,28 @@
+name: OIDC test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["feature/**"]
+    paths: [".github/workflows/oidc-test.yml"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  whoami:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/1015645511944/locations/global/workloadIdentityPools/github/providers/github-oidc
+          service_account: github-deployer@servtkt-cloudnative-dev.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Qui suis-je ?
+        run: gcloud auth list
+
+      - name: Lecture du bucket de state
+        run: gcloud storage ls gs://servtkt-cloudnative-dev-tfstate-eu/

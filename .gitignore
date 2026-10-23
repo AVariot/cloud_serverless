@@ -3,5 +3,17 @@
 *.tfstate
 *.tfstate.*
 *.tfplan
+tfplan
 .env
-*.json
+
+# Node
+node_modules/
+dist/
+
+# Build Terraform (zips de fonctions)
+.build/
+
+# Secrets : jamais de clés de compte de service
+service-account*.json
+credentials*.json
+*-key.json
