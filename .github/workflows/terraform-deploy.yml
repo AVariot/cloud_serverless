@@ -1,32 +1,34 @@
-name: Terraform Destroy
+   name: Terraform Deploy
 
-on:
-  workflow_dispatch:
-    inputs:
-      env:
-        description: "Environment to destroy"
-        type: choice
-        options: [dev, prd]
-        required: true
-        default: dev
+   on:
+     push:
+       tags: ['v*']
 
-permissions:
-  contents: read
-  id-token: write
+   permissions:
+     contents: read
+     id-token: write
 
-jobs:
-  destroy:
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.env }}
-    defaults:
-      run:
-        working-directory: infra/foundation
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.DEPLOYER_SA }}
-      - run: terraform init -input=false -backend-config=backends/${{ inputs.env }}.hcl
-      - run: terraform destroy -input=false -auto-approve -var-file=${{ inputs.env }}.tfvars
+   concurrency:
+     group: terraform-deploy
+     cancel-in-progress: false
+
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       strategy:
+         max-parallel: 1
+         matrix:
+           env: [dev, prd]
+       environment: ${{ matrix.env }}
+       defaults:
+         run:
+           working-directory: infra/foundation
+       steps:
+         - uses: actions/checkout@v4
+         - uses: hashicorp/setup-terraform@v3
+         - uses: google-github-actions/auth@v2
+           with:
+             workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+             service_account: ${{ vars.DEPLOYER_SA }}
+         - run: terraform init -input=false -backend-config=backends/${{ matrix.env }}.hcl
+         - run: terraform apply -input=false -auto-approve -var-file=${{ matrix.env }}.tfvars
