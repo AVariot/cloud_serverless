@@ -11,6 +11,6 @@ variable "region" {
 }
 
 variable "github_repo" {
-  type      = string
+  type        = string
   description = "Project deployed"
 }

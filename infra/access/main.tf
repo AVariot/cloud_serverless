@@ -46,3 +46,17 @@ resource "google_project_iam_member" "github_deployer_network" {
   member  = google_service_account.github_deployer.member
 }
 
+
+# Lecture seule sur le projet : nécessaire au `terraform plan` (refresh des ressources)
+resource "google_project_iam_member" "github_deployer_viewer" {
+  project = var.project_id
+  role    = "roles/viewer"
+  member  = google_service_account.github_deployer.member
+}
+
+# Lecture des politiques IAM (projet, comptes de service) : `plan` de la stack access
+resource "google_project_iam_member" "github_deployer_security_reviewer" {
+  project = var.project_id
+  role    = "roles/iam.securityReviewer"
+  member  = google_service_account.github_deployer.member
+}

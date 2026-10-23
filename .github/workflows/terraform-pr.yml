@@ -1,0 +1,52 @@
+name: Terraform PR
+
+on:
+  push:
+    branches: ["feature/**"]
+    paths: ["infra/**", ".github/workflows/terraform-pr.yml"]
+  pull_request:
+    paths: ["infra/**", ".github/workflows/terraform-pr.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform:
+    name: ${{ matrix.stack }} (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [access, foundation]
+        env: [dev]
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/1015645511944/locations/global/workloadIdentityPools/github/providers/github-oidc
+          service_account: github-deployer@servtkt-cloudnative-dev.iam.gserviceaccount.com
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Format
+        run: terraform fmt -check -diff
+
+      - name: Init
+        run: terraform init -input=false -backend-config=backends/${{ matrix.env }}.hcl
+
+      - name: Validate
+        run: terraform validate
+
+      # -lock=false : un plan en PR ne modifie rien, il ne doit pas bloquer un apply en cours
+      - name: Plan
+        run: terraform plan -input=false -lock=false -var-file=${{ matrix.env }}.tfvars
