@@ -50,3 +50,6 @@ func publishDraw(ctx context.Context, req drawRequest, eventID, correlationID st
 	_, err = res.Get(ctx)
 	return err
 }
+
+// publish est une variable pour que les tests puissent remplacer la vraie publication.
+var publish = publishDraw
