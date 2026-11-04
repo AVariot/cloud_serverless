@@ -60,3 +60,17 @@ resource "google_project_iam_member" "github_deployer_security_reviewer" {
   role    = "roles/iam.securityReviewer"
   member  = google_service_account.github_deployer.member
 }
+
+# Pub/Sub : la CI doit pouvoir créer topics, souscriptions et leurs droits IAM
+resource "google_project_iam_member" "github_deployer_pubsub" {
+  project = var.project_id
+  role    = "roles/pubsub.admin"
+  member  = google_service_account.github_deployer.member
+}
+
+# Pub/Sub : mon compte, pour lire et poser les droits IAM des topics
+resource "google_project_iam_member" "alexis_pubsub" {
+  project = var.project_id
+  role    = "roles/pubsub.admin"
+  member  = "user:alexisvariot418@gmail.com"
+}
