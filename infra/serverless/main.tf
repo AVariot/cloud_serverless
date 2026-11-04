@@ -27,3 +27,18 @@ resource "google_pubsub_topic_iam_member" "proxy_publisher" {
   role   = "roles/pubsub.publisher"
   member = module.proxy.service_account_member
 }
+
+# Identite de la gateway
+resource "google_service_account" "gateway" {
+  account_id   = "gateway-sa"
+  display_name = "Identité de l'API Gateway"
+}
+
+# Gateway invoke le proxy
+resource "google_cloud_run_v2_service_iam_member" "gateway_invokes_proxy" {
+  project  = var.project_id
+  location = var.region
+  name     = module.proxy.name
+  role     = "roles/run.invoker"
+  member   = google_service_account.gateway.member
+}
