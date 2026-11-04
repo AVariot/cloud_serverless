@@ -57,7 +57,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	if err := publishDraw(ctx, req, eventID, correlationID); err != nil {
+	if err := publish(ctx, req, eventID, correlationID); err != nil {
 		logger.Error("publication impossible", "correlation_id", correlationID, "event_id", eventID, "error", err.Error())
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "file indisponible", "correlation_id": correlationID})
 		return

@@ -1,0 +1,41 @@
+swagger: "2.0"
+info:
+  title: pixel-api
+  version: "1.0.0"
+schemes:
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: x-api-key
+    in: header
+security:
+  - api_key: []
+
+paths:
+  /draw:
+    post:
+      operationId: draw
+      summary: Demande de dessiner un pixel (traitée de façon asynchrone)
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            required: [x, y, color, user_id]
+            properties:
+              x: { type: integer }
+              y: { type: integer }
+              color: { type: string }
+              user_id: { type: string }
+      x-google-backend:
+        address: ${proxy_url}
+      responses:
+        "202":
+          description: Événement accepté
