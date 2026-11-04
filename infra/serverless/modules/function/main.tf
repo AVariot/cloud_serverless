@@ -1,0 +1,57 @@
+# main.tf
+
+locals {
+  sa_id = "${var.name}-fn-sa"
+}
+
+# Identité d'exécution dédiée : par défaut elle n'a aucun droit
+resource "google_service_account" "this" {
+  account_id   = local.sa_id
+  display_name = "Identité d'exécution de la fonction ${var.name}"
+}
+
+# Droit commun à toutes les fonctions : écrire des logs
+resource "google_project_iam_member" "log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = google_service_account.this.member
+}
+
+# Zip du code (le dossier cmd/ ne sert qu'au lancement local)
+data "archive_file" "src" {
+  type        = "zip"
+  source_dir  = var.source_dir
+  output_path = "${path.root}/.build/${var.name}.zip"
+  excludes    = ["cmd"]
+}
+
+# Upload du zip : le nom change avec le contenu, ce qui force un redéploiement
+resource "google_storage_bucket_object" "src" {
+  name   = "${var.name}-${data.archive_file.src.output_md5}.zip"
+  bucket = var.source_bucket
+  source = data.archive_file.src.output_path
+}
+
+# La fonction (Cloud Run functions gen2), privée : aucun invoker public
+resource "google_cloudfunctions2_function" "this" {
+  name     = var.name
+  location = var.region
+
+  build_config {
+    runtime     = var.runtime
+    entry_point = var.entry_point
+    source {
+      storage_source {
+        bucket = var.source_bucket
+        object = google_storage_bucket_object.src.name
+      }
+    }
+  }
+
+  service_config {
+    service_account_email = google_service_account.this.email
+    available_memory      = var.memory
+    timeout_seconds       = var.timeout_seconds
+    environment_variables = var.env
+  }
+}
