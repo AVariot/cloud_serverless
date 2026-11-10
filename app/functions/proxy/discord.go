@@ -9,7 +9,13 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 )
+
+func init() {
+	functions.HTTP("DiscordProxy", handleDiscord)
+}
 
 // interaction : ce que Discord envoie (seuls les champs utiles au worker).
 type interaction struct {
