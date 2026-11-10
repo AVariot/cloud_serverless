@@ -88,3 +88,17 @@ resource "google_project_iam_member" "alexis_secretmanager" {
   role    = "roles/secretmanager.admin"
   member  = "user:alexisvariot418@gmail.com"
 }
+
+# Firestore : la CI doit pouvoir créer la base (editor ne le permet pas)
+resource "google_project_iam_member" "github_deployer_datastore" {
+  project = var.project_id
+  role    = "roles/datastore.owner"
+  member  = google_service_account.github_deployer.member
+}
+
+# Firestore : mon compte, pour créer la base en local (editor ne le permet pas)
+resource "google_project_iam_member" "alexis_datastore" {
+  project = var.project_id
+  role    = "roles/datastore.owner"
+  member  = "user:alexisvariot418@gmail.com"
+}
