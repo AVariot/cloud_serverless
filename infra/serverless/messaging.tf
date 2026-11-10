@@ -48,9 +48,23 @@ resource "google_pubsub_subscription" "pixel_events_worker" {
     max_delivery_attempts = 5
   }
 
+  # Push : Pub/Sub appelle le worker avec un jeton OIDC (le statut HTTP vaut acquittement)
+  push_config {
+    push_endpoint = module.draw_pixel.uri
+
+    oidc_token {
+      service_account_email = google_service_account.pubsub_push.email
+    }
+  }
+
   expiration_policy {
     ttl = ""
   }
+
+  depends_on = [
+    google_cloud_run_v2_service_iam_member.push_invokes_draw_pixel,
+    google_service_account_iam_member.pubsub_creates_push_tokens,
+  ]
 }
 
 resource "google_project_service_identity" "pubsub" {
