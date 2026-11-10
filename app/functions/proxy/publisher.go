@@ -51,8 +51,8 @@ func publishMessage(ctx context.Context, topic string, data []byte, attrs map[st
 }
 
 // publishDraw envoie l'événement pixel.draw (chemin web).
-func publishDraw(ctx context.Context, req drawRequest, eventID, correlationID string) error {
-	data, err := json.Marshal(req)
+func publishDraw(ctx context.Context, evt drawEvent, eventID, correlationID string) error {
+	data, err := json.Marshal(evt)
 	if err != nil {
 		return err
 	}
