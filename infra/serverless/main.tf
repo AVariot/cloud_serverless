@@ -18,6 +18,7 @@ module "discord_proxy" {
 
   env = {
     GCP_PROJECT        = var.project_id
+    TOPIC_NAME         = google_pubsub_topic.pixel_events.name
     DISCORD_TOPIC_NAME = google_pubsub_topic.discord_command.name
   }
 
@@ -25,6 +26,9 @@ module "discord_proxy" {
   secret_env = {
     DISCORD_PUBLIC_KEY = google_secret_manager_secret.discord_public_key.secret_id
   }
+
+  # Discord impose 3 secondes : une instance reste chaude pour éviter le démarrage à froid (mesuré > 3 s au premier appel)
+  min_instances = 1
 
   # La fonction démarre seulement quand elle a le droit de lire ce secret
   wait_for = [google_secret_manager_secret_iam_member.proxy_discord_public_key]
@@ -50,6 +54,13 @@ resource "google_pubsub_topic_iam_member" "proxy_publisher" {
   topic  = google_pubsub_topic.pixel_events.id
   role   = "roles/pubsub.publisher"
   member = module.proxy.service_account_member
+}
+
+# Le proxy Discord publie aussi /draw directement sur le topic des pixels (même événement que le web)
+resource "google_pubsub_topic_iam_member" "discord_proxy_pixel_publisher" {
+  topic  = google_pubsub_topic.pixel_events.id
+  role   = "roles/pubsub.publisher"
+  member = module.discord_proxy.service_account_member
 }
 
 # Le proxy Discord publie les commandes, sur ce topic uniquement
