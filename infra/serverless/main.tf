@@ -17,8 +17,14 @@ module "proxy" {
   source_bucket = google_storage_bucket.functions_src.name
 
   env = {
-    GCP_PROJECT = var.project_id
-    TOPIC_NAME  = google_pubsub_topic.pixel_events.name
+    GCP_PROJECT        = var.project_id
+    TOPIC_NAME         = google_pubsub_topic.pixel_events.name
+    DISCORD_TOPIC_NAME = google_pubsub_topic.discord_command.name
+  }
+
+  # Clé publique Discord : lue dans Secret Manager, jamais écrite dans le code ni dans le state
+  secret_env = {
+    DISCORD_PUBLIC_KEY = google_secret_manager_secret.discord_public_key.secret_id
   }
 }
 
@@ -26,6 +32,20 @@ resource "google_pubsub_topic_iam_member" "proxy_publisher" {
   topic  = google_pubsub_topic.pixel_events.id
   role   = "roles/pubsub.publisher"
   member = module.proxy.service_account_member
+}
+
+# Le proxy publie aussi les commandes Discord, sur ce topic uniquement
+resource "google_pubsub_topic_iam_member" "proxy_discord_publisher" {
+  topic  = google_pubsub_topic.discord_command.id
+  role   = "roles/pubsub.publisher"
+  member = module.proxy.service_account_member
+}
+
+# Le proxy peut lire la clé publique Discord, et aucun autre secret
+resource "google_secret_manager_secret_iam_member" "proxy_discord_public_key" {
+  secret_id = google_secret_manager_secret.discord_public_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = module.proxy.service_account_member
 }
 
 # Identite de la gateway

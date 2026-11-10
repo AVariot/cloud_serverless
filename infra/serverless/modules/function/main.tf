@@ -17,12 +17,12 @@ resource "google_project_iam_member" "log_writer" {
   member  = google_service_account.this.member
 }
 
-# Zip du code (le dossier cmd/ ne sert qu'au lancement local)
+# Zip du code (cmd/ ne sert qu'au lancement local, les tests n'ont rien à faire en production)
 data "archive_file" "src" {
   type        = "zip"
   source_dir  = var.source_dir
   output_path = "${path.root}/.build/${var.name}.zip"
-  excludes    = ["cmd"]
+  excludes    = ["cmd", "*_test.go"]
 }
 
 # Upload du zip : le nom change avec le contenu, ce qui force un redéploiement
@@ -53,5 +53,16 @@ resource "google_cloudfunctions2_function" "this" {
     available_memory      = var.memory
     timeout_seconds       = var.timeout_seconds
     environment_variables = var.env
+
+    # Secrets lus par la plateforme avec l'identité de la fonction (le droit d'accès est donné à part)
+    dynamic "secret_environment_variables" {
+      for_each = var.secret_env
+      content {
+        key        = secret_environment_variables.key
+        project_id = var.project_id
+        secret     = secret_environment_variables.value
+        version    = "latest"
+      }
+    }
   }
 }

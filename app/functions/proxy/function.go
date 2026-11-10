@@ -24,7 +24,16 @@ type drawRequest struct {
 }
 
 func init() {
-	functions.HTTP("Proxy", handle)
+	functions.HTTP("Proxy", route)
+}
+
+// route aiguille selon le chemin : /discord vers les interactions Discord, le reste vers le dessin web.
+func route(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/discord" {
+		handleDiscord(w, r)
+		return
+	}
+	handle(w, r)
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {

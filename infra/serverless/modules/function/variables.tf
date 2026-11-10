@@ -53,3 +53,9 @@ variable "env" {
   type        = map(string)
   default     = {}
 }
+
+variable "secret_env" {
+  description = "Secrets exposés en variables d'environnement : nom de la variable => secret_id dans Secret Manager"
+  type        = map(string)
+  default     = {}
+}

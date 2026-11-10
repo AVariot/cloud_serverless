@@ -39,3 +39,23 @@ paths:
       responses:
         "202":
           description: Événement accepté
+
+  /discord:
+    post:
+      operationId: discord
+      summary: Interactions Discord (authentifiées par signature Ed25519 dans le proxy, pas par clé API)
+      # Discord ne sait pas envoyer d'x-api-key : on retire l'exigence globale pour cette route seulement
+      security: []
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+      x-google-backend:
+        address: ${proxy_url}
+        # Le proxy aiguille selon le chemin : il doit recevoir /discord
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "200":
+          description: Réponse à Discord (PONG ou accusé différé)

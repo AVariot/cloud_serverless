@@ -74,3 +74,17 @@ resource "google_project_iam_member" "alexis_pubsub" {
   role    = "roles/pubsub.admin"
   member  = "user:alexisvariot418@gmail.com"
 }
+
+# Secret Manager : la CI doit pouvoir créer les secrets et poser leurs droits d'accès
+resource "google_project_iam_member" "github_deployer_secretmanager" {
+  project = var.project_id
+  role    = "roles/secretmanager.admin"
+  member  = google_service_account.github_deployer.member
+}
+
+# Secret Manager : mon compte, pour poser les droits d'accès des secrets (editor ne le permet pas)
+resource "google_project_iam_member" "alexis_secretmanager" {
+  project = var.project_id
+  role    = "roles/secretmanager.admin"
+  member  = "user:alexisvariot418@gmail.com"
+}

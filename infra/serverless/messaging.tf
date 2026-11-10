@@ -71,3 +71,10 @@ resource "google_pubsub_subscription_iam_member" "worker_subscriber" {
   role         = "roles/pubsub.subscriber"
   member       = google_project_service_identity.pubsub.member
 }
+
+resource "google_pubsub_topic" "discord_command" {
+  name                       = "discord-command"
+  message_retention_duration = "604800s"
+
+  depends_on = [google_project_service.pubsub]
+}
