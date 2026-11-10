@@ -5,6 +5,8 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -90,6 +92,85 @@ func verifySignature(r *http.Request, body []byte) bool {
 	return ed25519.Verify(pub, msg, sig)
 }
 
+// commandOption : une option d'une commande slash, par exemple {"name":"x","type":4,"value":10}.
+type commandOption struct {
+	Name  string          `json:"name"`
+	Value json.RawMessage `json:"value"`
+}
+
+// drawFromOptions lit x, y et color dans les options de /draw.
+// Une option absente laisse le champ vide : c'est validate qui la refuse.
+func drawFromOptions(raw json.RawMessage) (drawRequest, error) {
+	var opts []commandOption
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &opts); err != nil {
+			return drawRequest{}, errors.New("options illisibles")
+		}
+	}
+
+	var req drawRequest
+	for _, o := range opts {
+		switch o.Name {
+		case "x", "y":
+			var n int
+			if err := json.Unmarshal(o.Value, &n); err != nil {
+				return drawRequest{}, fmt.Errorf("%s doit être un entier", o.Name)
+			}
+			if o.Name == "x" {
+				req.X = &n
+			} else {
+				req.Y = &n
+			}
+		case "color":
+			if err := json.Unmarshal(o.Value, &req.Color); err != nil {
+				return drawRequest{}, errors.New("color doit être un texte")
+			}
+		}
+	}
+	return req, nil
+}
+
+// discordReply répond tout de suite à l'interaction (type 4).
+// ephemeral : seul l'utilisateur voit le message (erreurs). Un statut HTTP d'erreur s'afficherait
+// comme « L'application ne répond plus » : on répond donc toujours 200 avec un message lisible.
+func discordReply(w http.ResponseWriter, content string, ephemeral bool) {
+	data := map[string]any{"content": content}
+	if ephemeral {
+		data["flags"] = 64
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"type": 4, "data": data})
+}
+
+// handleDiscordDraw valide /draw, publie le même drawEvent que le chemin web, et répond directement.
+func handleDiscordDraw(w http.ResponseWriter, r *http.Request, it interaction, correlationID string) {
+	req, err := drawFromOptions(it.Data.Options)
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	} else {
+		msg = validate(req)
+	}
+	if msg != "" {
+		logger.Warn("draw refusé", "correlation_id", correlationID, "user_id", it.userID(), "reason", msg)
+		discordReply(w, msg, true)
+		return
+	}
+
+	eventID := newID()
+	// Discord impose 3 secondes : on garde de la marge pour la réponse.
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	evt := drawEvent{X: *req.X, Y: *req.Y, Color: req.Color, UserID: it.userID()}
+	if err := publish(ctx, evt, eventID, correlationID); err != nil {
+		logger.Error("publication impossible", "correlation_id", correlationID, "event_id", eventID, "command", "draw", "error", err.Error())
+		discordReply(w, "Impossible d'envoyer le pixel, réessayez.", true)
+		return
+	}
+
+	logger.Info("pixel.draw accepté", "correlation_id", correlationID, "event_id", eventID, "user_id", evt.UserID, "x", evt.X, "y", evt.Y)
+	discordReply(w, fmt.Sprintf("Pixel envoyé en (%d, %d) : %s", evt.X, evt.Y, evt.Color), false)
+}
+
 func handleDiscord(w http.ResponseWriter, r *http.Request) {
 	correlationID := r.Header.Get("X-Correlation-Id")
 	if correlationID == "" {
@@ -140,6 +221,12 @@ func handleDiscord(w http.ResponseWriter, r *http.Request) {
 		if it.userID() == "" || it.Data.Name == "" {
 			logger.Warn("commande incomplète", "correlation_id", correlationID)
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "commande incomplète", "correlation_id": correlationID})
+			return
+		}
+
+		// draw ne passe pas par discord-command : il va directement au topic des pixels, comme le chemin web
+		if it.Data.Name == "draw" {
+			handleDiscordDraw(w, r, it, correlationID)
 			return
 		}
 
