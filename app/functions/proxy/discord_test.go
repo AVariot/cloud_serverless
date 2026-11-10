@@ -190,11 +190,12 @@ func TestDiscordEchecPublication(t *testing.T) {
 func TestRouteAiguillage(t *testing.T) {
 	priv := newKey(t)
 
+	// Les deux handlers refusent avec un 401, mais pas pour la même raison : le message dit qui a répondu.
 	t.Run("/discord va vers Discord : un POST sans signature est refusé", func(t *testing.T) {
 		rec := httptest.NewRecorder()
 		route(rec, httptest.NewRequest(http.MethodPost, "/discord", strings.NewReader(`{"type":1}`)))
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("code=%d, attendu 401", rec.Code)
+		if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "signature invalide") {
+			t.Errorf("code=%d corps=%s, attendu 401 « signature invalide »", rec.Code, rec.Body.String())
 		}
 	})
 
@@ -210,8 +211,8 @@ func TestRouteAiguillage(t *testing.T) {
 		t.Run(path+" va vers le dessin web", func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			route(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{pas du json`)))
-			if rec.Code != http.StatusBadRequest {
-				t.Errorf("code=%d, attendu 400 du handler web", rec.Code)
+			if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "authentification requise") {
+				t.Errorf("code=%d corps=%s, attendu 401 « authentification requise » du handler web", rec.Code, rec.Body.String())
 			}
 		})
 	}
