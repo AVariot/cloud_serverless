@@ -37,6 +37,9 @@ resource "google_cloudfunctions2_function" "this" {
   name     = var.name
   location = var.region
 
+  # Attend les droits donnés à part (module n'a pas le droit de dépendre de l'IAM qui dépend de lui : on passe par une variable)
+  depends_on = [var.wait_for]
+
   build_config {
     runtime     = var.runtime
     entry_point = var.entry_point

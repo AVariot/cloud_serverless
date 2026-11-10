@@ -54,6 +54,12 @@ variable "env" {
   default     = {}
 }
 
+variable "wait_for" {
+  description = "Ressources à créer avant la fonction (ex. droit de lire un secret) : évite l'échec du premier déploiement"
+  type        = any
+  default     = []
+}
+
 variable "secret_env" {
   description = "Secrets exposés en variables d'environnement : nom de la variable => secret_id dans Secret Manager"
   type        = map(string)
