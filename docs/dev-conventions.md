@@ -32,11 +32,11 @@ Every piece of work starts with a GitHub issue. No issue, no branch.
 
 ### Creating a branch for an issue
 
-Create the branch yourself from an up-to-date `main`, named after the issue's type and number
+Create the branch yourself from an up-to-date `dev`, named after the issue's type and number
 (see [Branch names](#branch-names)):
 
 ```bash
-git switch main && git pull
+git switch dev && git pull
 git switch -c feature/12-gke-cluster
 ```
 
@@ -49,15 +49,21 @@ when the PR is merged. Large work is split into several issues, each with its ow
 
 ```
 feature/12-gke-cluster ──PR──┐
-fix/18-proxy-timeout ────PR──┼──▶ main ──tag v0.3.0──▶ deploy dev ──▶ deploy prd
+fix/18-proxy-timeout ────PR──┼──▶ dev ──release PR──▶ main ──tag v0.3.0──▶ deploy dev ──▶ deploy prd
 docs/20-architecture ────PR──┘
 ```
 
-- `main` is the only long-lived branch. It is protected and always deployable:
-  no direct pushes, no force-pushes, no deletion.
-- All work happens on short-lived branches created from an up-to-date `main`.
-- A branch is merged into `main` through a pull request only.
-- Deployments are triggered by release tags on `main`, never by a merge (see [Releases](#releases)).
+We have two long-lived branches, both protected (no direct pushes, no force-pushes, no deletion):
+
+| Branch | Role | Receives |
+| --- | --- | --- |
+| `dev` | Integration: the next release is assembled here | Pull requests from short-lived branches |
+| `main` | Released code only, always deployable | Release pull requests from `dev` |
+
+- All work happens on short-lived branches created from an up-to-date `dev`.
+- A branch is merged into `dev` through a pull request only.
+- `main` only moves through a release pull request from `dev` (see [Releases](#releases)).
+- Deployments are triggered by release tags on `main`, never by a merge.
 
 ### Branch names
 
@@ -79,8 +85,8 @@ Format: `<type>/<issue-number>-<short-description>`
 
 1. Create the branch for its issue (see [Creating a branch for an issue](#creating-a-branch-for-an-issue)).
 2. Keep the branch short-lived: one topic, merged within a few days.
-3. If `main` moves ahead, update your branch with `git merge main` before asking for review.
-4. Open a pull request into `main` with `Closes #12` in its description.
+3. If `dev` moves ahead, update your branch with `git merge dev` before asking for review.
+4. Open a pull request into `dev` with `Closes #12` in its description.
    The Terraform checks (fmt, validate, plan for dev and prd) must pass.
 5. Get **1 approval** from a teammate other than the author.
 6. Merge with **Create a merge commit**, then delete the branch.
@@ -136,14 +142,14 @@ chore: remove committed tfplan file
 
 ### Pull requests
 
-Pull requests are merged with a merge commit, so **every commit of the branch ends up on `main`**.
+Pull requests are merged with a merge commit, so **every commit of the branch ends up on `dev`, then on `main`**.
 Each commit message must follow these rules, not only the last one.
 
 Write the PR title in the same format: `feat(foundation): add GKE cluster with runner node pool`.
 
 ## Signed commits
 
-All commits and tags must be signed and show as **Verified** on GitHub; `main` rejects unsigned commits.
+All commits and tags must be signed and show as **Verified** on GitHub; `dev` and `main` reject unsigned commits.
 
 ```bash
 gpg --list-secret-keys --keyid-format=long      # find your key id
@@ -162,10 +168,14 @@ Check a commit with `git log --show-signature -1`.
   - `MINOR` (`v0.4.0`): new feature, nothing breaks
   - `MAJOR` (`v1.0.0`): breaking change
 - We stay in `v0.x.y` until the project is ready for the defense, which is `v1.0.0`.
-- Tag when a feature works end to end, not after every merge:
-  ```bash
-  git switch main && git pull
-  git tag -s v0.4.0 -m "v0.4.0"
-  git push origin v0.4.0
-  ```
-- Pushing a tag deploys to dev, then to prd after approval.
+- Release when a feature works end to end on `dev`, not after every merge:
+  1. Open a pull request from `dev` into `main`, titled `release: v0.4.0`, listing the issues it ships.
+  2. Get **1 approval** and merge it with **Create a merge commit**.
+  3. Tag the merge commit on `main`:
+     ```bash
+     git switch main && git pull
+     git tag -s v0.4.0 -m "v0.4.0"
+     git push origin v0.4.0
+     ```
+- Pushing the tag deploys to the dev environment, then to prd after approval.
+- A fix needed on `main` is still made on a `fix/` branch from `dev`, then released the same way as a `PATCH` version.
