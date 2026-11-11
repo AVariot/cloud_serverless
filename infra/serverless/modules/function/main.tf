@@ -55,6 +55,7 @@ resource "google_cloudfunctions2_function" "this" {
     service_account_email = google_service_account.this.email
     available_memory      = var.memory
     timeout_seconds       = var.timeout_seconds
+    min_instance_count    = var.min_instances
     environment_variables = var.env
 
     # Secrets lus par la plateforme avec l'identité de la fonction (le droit d'accès est donné à part)

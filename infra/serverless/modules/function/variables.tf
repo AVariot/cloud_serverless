@@ -48,6 +48,12 @@ variable "timeout_seconds" {
   default     = 60
 }
 
+variable "min_instances" {
+  description = "Instances gardées chaudes en permanence (0 = la fonction peut s'éteindre : démarrage à froid au prochain appel)"
+  type        = number
+  default     = 0
+}
+
 variable "env" {
   description = "Variables d'environnement de la fonction"
   type        = map(string)
