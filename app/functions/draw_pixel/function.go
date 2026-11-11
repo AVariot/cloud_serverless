@@ -1,5 +1,7 @@
 package drawpixel
 
+// Worker draw-pixel
+
 import (
 	"context"
 	"encoding/json"

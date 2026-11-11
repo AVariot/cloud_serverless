@@ -46,3 +46,29 @@ resource "google_service_account_iam_member" "pubsub_creates_push_tokens" {
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = google_project_service_identity.pubsub.member
 }
+
+# Worker des commandes admin
+module "admin_cmd" {
+  source = "./modules/function"
+
+  project_id    = var.project_id
+  region        = var.region
+  name          = "admin-cmd"
+  entry_point   = "AdminCmd"
+  source_dir    = "${path.module}/../../app/functions/admin_cmd"
+  source_bucket = google_storage_bucket.functions_src.name
+
+  env = {
+    GCP_PROJECT = var.project_id
+  }
+
+  depends_on = [google_firestore_database.main]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "push_invokes_admin_cmd" {
+  project  = var.project_id
+  location = var.region
+  name     = module.admin_cmd.name
+  role     = "roles/run.invoker"
+  member   = google_service_account.pubsub_push.member
+}

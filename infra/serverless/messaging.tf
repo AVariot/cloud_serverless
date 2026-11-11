@@ -111,9 +111,13 @@ resource "google_pubsub_subscription" "discord_command_dlq_hold" {
   }
 }
 
-resource "google_pubsub_subscription" "discord_command_worker" {
-  name  = "discord-command-worker"
+# Une souscription par type de commande : le filtre ne laisse passer que command = "admin"
+# (un filtre ne se modifie pas après création : le changer recrée la souscription)
+resource "google_pubsub_subscription" "discord_command_admin" {
+  name  = "discord-command-admin"
   topic = google_pubsub_topic.discord_command.id
+
+  filter = "attributes.command = \"admin\""
 
   ack_deadline_seconds       = 60
   retain_acked_messages      = true
@@ -129,9 +133,23 @@ resource "google_pubsub_subscription" "discord_command_worker" {
     max_delivery_attempts = 5
   }
 
+  # Push : Pub/Sub appelle admin-cmd avec un jeton OIDC (le statut HTTP vaut acquittement)
+  push_config {
+    push_endpoint = module.admin_cmd.uri
+
+    oidc_token {
+      service_account_email = google_service_account.pubsub_push.email
+    }
+  }
+
   expiration_policy {
     ttl = ""
   }
+
+  depends_on = [
+    google_cloud_run_v2_service_iam_member.push_invokes_admin_cmd,
+    google_service_account_iam_member.pubsub_creates_push_tokens,
+  ]
 }
 
 resource "google_pubsub_topic_iam_member" "discord_command_dlq_publisher" {
@@ -140,8 +158,8 @@ resource "google_pubsub_topic_iam_member" "discord_command_dlq_publisher" {
   member = google_project_service_identity.pubsub.member
 }
 
-resource "google_pubsub_subscription_iam_member" "discord_command_worker_subscriber" {
-  subscription = google_pubsub_subscription.discord_command_worker.id
+resource "google_pubsub_subscription_iam_member" "discord_command_admin_subscriber" {
+  subscription = google_pubsub_subscription.discord_command_admin.id
   role         = "roles/pubsub.subscriber"
   member       = google_project_service_identity.pubsub.member
 }
