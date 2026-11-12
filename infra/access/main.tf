@@ -68,6 +68,27 @@ resource "google_project_iam_member" "github_deployer_pubsub" {
   member  = google_service_account.github_deployer.member
 }
 
+# GKE : la CI doit pouvoir créer le cluster et ses node pools
+resource "google_project_iam_member" "github_deployer_container" {
+  project = var.project_id
+  role    = "roles/container.admin"
+  member  = google_service_account.github_deployer.member
+}
+
+# GKE : attacher un compte de service aux nodes du cluster
+resource "google_project_iam_member" "github_deployer_sa_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = google_service_account.github_deployer.member
+}
+
+# Activation des APIs (container.googleapis.com, ...) depuis Terraform
+resource "google_project_iam_member" "github_deployer_service_usage" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
+  member  = google_service_account.github_deployer.member
+}
+
 # Pub/Sub : mon compte, pour lire et poser les droits IAM des topics
 resource "google_project_iam_member" "alexis_pubsub" {
   project = var.project_id
