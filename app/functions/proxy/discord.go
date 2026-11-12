@@ -122,9 +122,11 @@ func drawFromOptions(raw json.RawMessage) (drawRequest, error) {
 				req.Y = &n
 			}
 		case "color":
-			if err := json.Unmarshal(o.Value, &req.Color); err != nil {
-				return drawRequest{}, errors.New("color doit être un texte")
+			var n int
+			if err := json.Unmarshal(o.Value, &n); err != nil {
+				return drawRequest{}, errors.New("color doit être un numéro de la palette")
 			}
+			req.Color = &n
 		}
 	}
 	return req, nil
@@ -160,7 +162,7 @@ func handleDiscordDraw(w http.ResponseWriter, r *http.Request, it interaction, c
 	// Discord impose 3 secondes : on garde de la marge pour la réponse.
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	evt := drawEvent{X: *req.X, Y: *req.Y, Color: req.Color, UserID: it.userID()}
+	evt := drawEvent{X: *req.X, Y: *req.Y, Color: *req.Color, UserID: it.userID()}
 	if err := publish(ctx, evt, eventID, correlationID); err != nil {
 		logger.Error("publication impossible", "correlation_id", correlationID, "event_id", eventID, "command", "draw", "error", err.Error())
 		discordReply(w, "Impossible d'envoyer le pixel, réessayez.", true)
@@ -168,7 +170,7 @@ func handleDiscordDraw(w http.ResponseWriter, r *http.Request, it interaction, c
 	}
 
 	logger.Info("pixel.draw accepté", "correlation_id", correlationID, "event_id", eventID, "user_id", evt.UserID, "x", evt.X, "y", evt.Y)
-	discordReply(w, fmt.Sprintf("Pixel envoyé en (%d, %d) : %s", evt.X, evt.Y, evt.Color), false)
+	discordReply(w, fmt.Sprintf("Pixel envoyé en (%d, %d) : %s", evt.X, evt.Y, colorName(evt.Color)), false)
 }
 
 func handleDiscord(w http.ResponseWriter, r *http.Request) {

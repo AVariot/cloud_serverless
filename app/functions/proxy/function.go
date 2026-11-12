@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -16,13 +15,11 @@ import (
 
 const gridSize = 10000
 
-var colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
-
 // drawRequest : ce que le client envoie. Il n'y a pas de user_id : on ne fait pas confiance au corps.
 type drawRequest struct {
-	X     *int   `json:"x"`
-	Y     *int   `json:"y"`
-	Color string `json:"color"`
+	X     *int `json:"x"`
+	Y     *int `json:"y"`
+	Color *int `json:"color"` // numéro de la palette (config/palette.json), pas un code RGB
 }
 
 // drawEvent : le message publié pour le worker (le contrat avec l'équipe).
@@ -30,7 +27,7 @@ type drawRequest struct {
 type drawEvent struct {
 	X      int    `json:"x"`
 	Y      int    `json:"y"`
-	Color  string `json:"color"`
+	Color  int    `json:"color"` // numéro de la palette
 	UserID string `json:"user_id"`
 }
 
@@ -45,6 +42,13 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		correlationID = newID()
 	}
 	w.Header().Set("X-Correlation-Id", correlationID)
+
+	// CORS : avant tout, pour que même les erreurs portent les en-têtes ; le préflight n'a pas de jeton
+	setCORS(w, r)
+	if r.Method == http.MethodOptions {
+		handlePreflight(w, r)
+		return
+	}
 
 	// 2. Method
 	if r.Method != http.MethodPost {
@@ -93,7 +97,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	evt := drawEvent{X: *req.X, Y: *req.Y, Color: req.Color, UserID: userID}
+	evt := drawEvent{X: *req.X, Y: *req.Y, Color: *req.Color, UserID: userID}
 	if err := publish(ctx, evt, eventID, correlationID); err != nil {
 		logger.Error("publication impossible", "correlation_id", correlationID, "event_id", eventID, "error", err.Error())
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "file indisponible", "correlation_id": correlationID})
@@ -108,8 +112,8 @@ func validate(req drawRequest) string {
 	if req.X == nil || req.Y == nil || *req.X < 0 || *req.X >= gridSize || *req.Y < 0 || *req.Y >= gridSize {
 		return "x et y doivent être des entiers entre 0 et 9999"
 	}
-	if !colorRe.MatchString(req.Color) {
-		return "color doit être au format #RRGGBB"
+	if req.Color == nil || !validColor(*req.Color) {
+		return "color doit être un numéro de la palette"
 	}
 	return ""
 }

@@ -203,7 +203,7 @@ func drawBody(options string) string {
 		"member":{"user":{"id":"u42"},"roles":[]}}`
 }
 
-const validOptions = `[{"name":"x","type":4,"value":10},{"name":"y","type":4,"value":20},{"name":"color","type":3,"value":"#ff0000"}]`
+const validOptions = `[{"name":"x","type":4,"value":10},{"name":"y","type":4,"value":20},{"name":"color","type":4,"value":2}]`
 
 // drawReply décode la réponse de type 4 : son contenu et si elle est privée (flags 64).
 func drawReply(t *testing.T, body string) (content string, ephemeral bool, typ int) {
@@ -248,7 +248,7 @@ func TestDiscordDrawPublieSurLeTopicDesPixels(t *testing.T) {
 	if !strings.Contains(content, "10") || !strings.Contains(content, "20") {
 		t.Errorf("la réponse devrait rappeler les coordonnées : %q", content)
 	}
-	if calls != 1 || got != (drawEvent{X: 10, Y: 20, Color: "#ff0000", UserID: "u42"}) {
+	if calls != 1 || got != (drawEvent{X: 10, Y: 20, Color: 2, UserID: "u42"}) {
 		t.Errorf("publications=%d, événement=%+v", calls, got)
 	}
 }
@@ -264,7 +264,7 @@ func TestDiscordDrawUserIDVientDeLaSignature(t *testing.T) {
 	}
 	t.Cleanup(func() { publish = publishDraw })
 
-	options := `[{"name":"x","type":4,"value":1},{"name":"y","type":4,"value":1},{"name":"color","type":3,"value":"#00ff00"},{"name":"user_id","type":3,"value":"imposteur"}]`
+	options := `[{"name":"x","type":4,"value":1},{"name":"y","type":4,"value":1},{"name":"color","type":4,"value":3},{"name":"user_id","type":3,"value":"imposteur"}]`
 	serve(signedRequest(priv, drawBody(options)))
 
 	if got.UserID != "u42" {
@@ -276,14 +276,16 @@ func TestDiscordDrawRefuse(t *testing.T) {
 	priv := newKey(t)
 
 	tests := map[string]string{
-		"x hors grille":    `[{"name":"x","type":4,"value":10000},{"name":"y","type":4,"value":0},{"name":"color","type":3,"value":"#ff0000"}]`,
-		"y négatif":        `[{"name":"x","type":4,"value":0},{"name":"y","type":4,"value":-1},{"name":"color","type":3,"value":"#ff0000"}]`,
-		"couleur invalide": `[{"name":"x","type":4,"value":1},{"name":"y","type":4,"value":1},{"name":"color","type":3,"value":"rouge"}]`,
-		"x absent":         `[{"name":"y","type":4,"value":1},{"name":"color","type":3,"value":"#ff0000"}]`,
-		"couleur absente":  `[{"name":"x","type":4,"value":1},{"name":"y","type":4,"value":1}]`,
-		"aucune option":    `[]`,
-		"x pas un entier":  `[{"name":"x","type":3,"value":"abc"},{"name":"y","type":4,"value":1},{"name":"color","type":3,"value":"#ff0000"}]`,
-		"options cassées":  `"pas un tableau"`,
+		"x hors grille":        `[{"name":"x","type":4,"value":10000},{"name":"y","type":4,"value":0},{"name":"color","type":4,"value":2}]`,
+		"y négatif":            `[{"name":"x","type":4,"value":0},{"name":"y","type":4,"value":-1},{"name":"color","type":4,"value":2}]`,
+		"couleur hors palette": `[{"name":"x","type":4,"value":1},{"name":"y","type":4,"value":1},{"name":"color","type":4,"value":99}]`,
+		"couleur 0 (vide)":     `[{"name":"x","type":4,"value":1},{"name":"y","type":4,"value":1},{"name":"color","type":4,"value":0}]`,
+		"couleur en texte":     `[{"name":"x","type":4,"value":1},{"name":"y","type":4,"value":1},{"name":"color","type":3,"value":"rouge"}]`,
+		"x absent":             `[{"name":"y","type":4,"value":1},{"name":"color","type":4,"value":2}]`,
+		"couleur absente":      `[{"name":"x","type":4,"value":1},{"name":"y","type":4,"value":1}]`,
+		"aucune option":        `[]`,
+		"x pas un entier":      `[{"name":"x","type":3,"value":"abc"},{"name":"y","type":4,"value":1},{"name":"color","type":4,"value":2}]`,
+		"options cassées":      `"pas un tableau"`,
 	}
 	for name, options := range tests {
 		t.Run(name, func(t *testing.T) {
