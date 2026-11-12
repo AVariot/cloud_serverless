@@ -5,8 +5,8 @@ package drawpixel
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
@@ -14,7 +14,15 @@ import (
 
 const gridSize = 10000
 
-var colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+// chunkSize : côté d'un chunk, en pixels. C'est un contrat avec le front (chunks 500 × 500, soit 20 × 20 chunks)
+// et avec create_snapshot : le changer demande de prévenir les deux.
+const chunkSize = 500
+
+// chunkID donne le chunk d'un pixel, au format "cx_cy", l'origine 0_0 étant en haut à gauche.
+// Le front écoute seulement les chunks qu'il affiche : il filtre sur ce champ.
+func chunkID(x, y int) string {
+	return fmt.Sprintf("%d_%d", x/chunkSize, y/chunkSize)
+}
 
 type pushEnvelope struct {
 	Message struct {
@@ -28,7 +36,7 @@ type pushEnvelope struct {
 type drawEvent struct {
 	X      int    `json:"x"`
 	Y      int    `json:"y"`
-	Color  string `json:"color"`
+	Color  int    `json:"color"` // numéro de la palette (config/palette.json), pas un code RGB
 	UserID string `json:"user_id"`
 }
 
@@ -87,8 +95,8 @@ func validate(evt drawEvent) string {
 	if evt.X < 0 || evt.X >= gridSize || evt.Y < 0 || evt.Y >= gridSize {
 		return "x et y doivent être des entiers entre 0 et 9999"
 	}
-	if !colorRe.MatchString(evt.Color) {
-		return "color doit être au format #RRGGBB"
+	if !validColor(evt.Color) {
+		return "color doit être un numéro de la palette"
 	}
 	if evt.UserID == "" {
 		return "user_id manquant"

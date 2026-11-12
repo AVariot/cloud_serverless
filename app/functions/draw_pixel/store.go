@@ -59,6 +59,7 @@ func saveFirestore(ctx context.Context, evt drawEvent, at time.Time) error {
 			"y":          evt.Y,
 			"color":      evt.Color,
 			"user_id":    evt.UserID,
+			"chunk":      chunkID(evt.X, evt.Y),
 			"updated_at": at,
 		})
 	})
