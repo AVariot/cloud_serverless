@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -17,18 +18,19 @@ func TestValidate(t *testing.T) {
 		req     drawRequest
 		wantErr bool
 	}{
-		{"valide", drawRequest{X: intPtr(10), Y: intPtr(20), Color: "#ff0000", UserID: "u1"}, false},
-		{"coin haut-gauche", drawRequest{X: intPtr(0), Y: intPtr(0), Color: "#000000", UserID: "u1"}, false},
-		{"coin bas-droit", drawRequest{X: intPtr(9999), Y: intPtr(9999), Color: "#FFFFFF", UserID: "u1"}, false},
-		{"x absent", drawRequest{Y: intPtr(1), Color: "#ff0000", UserID: "u1"}, true},
-		{"y absent", drawRequest{X: intPtr(1), Color: "#ff0000", UserID: "u1"}, true},
-		{"x négatif", drawRequest{X: intPtr(-1), Y: intPtr(1), Color: "#ff0000", UserID: "u1"}, true},
-		{"x hors grille", drawRequest{X: intPtr(10000), Y: intPtr(1), Color: "#ff0000", UserID: "u1"}, true},
-		{"y hors grille", drawRequest{X: intPtr(1), Y: intPtr(10000), Color: "#ff0000", UserID: "u1"}, true},
-		{"couleur sans #", drawRequest{X: intPtr(1), Y: intPtr(1), Color: "ff0000", UserID: "u1"}, true},
-		{"couleur en toutes lettres", drawRequest{X: intPtr(1), Y: intPtr(1), Color: "rouge", UserID: "u1"}, true},
-		{"couleur à 3 chiffres", drawRequest{X: intPtr(1), Y: intPtr(1), Color: "#f00", UserID: "u1"}, true},
-		{"user_id vide", drawRequest{X: intPtr(1), Y: intPtr(1), Color: "#ff0000", UserID: ""}, true},
+		{"valide", drawRequest{X: intPtr(10), Y: intPtr(20), Color: intPtr(2)}, false},
+		{"coin haut-gauche", drawRequest{X: intPtr(0), Y: intPtr(0), Color: intPtr(1)}, false},
+		{"coin bas-droit", drawRequest{X: intPtr(9999), Y: intPtr(9999), Color: intPtr(3)}, false},
+		{"x absent", drawRequest{Y: intPtr(1), Color: intPtr(2)}, true},
+		{"y absent", drawRequest{X: intPtr(1), Color: intPtr(2)}, true},
+		{"x négatif", drawRequest{X: intPtr(-1), Y: intPtr(1), Color: intPtr(2)}, true},
+		{"x hors grille", drawRequest{X: intPtr(10000), Y: intPtr(1), Color: intPtr(2)}, true},
+		{"y hors grille", drawRequest{X: intPtr(1), Y: intPtr(10000), Color: intPtr(2)}, true},
+		{"couleur absente", drawRequest{X: intPtr(1), Y: intPtr(1)}, true},
+		{"couleur 0 (vide)", drawRequest{X: intPtr(1), Y: intPtr(1), Color: intPtr(0)}, true},
+		{"couleur hors palette", drawRequest{X: intPtr(1), Y: intPtr(1), Color: intPtr(4)}, true},
+		{"couleur négative", drawRequest{X: intPtr(1), Y: intPtr(1), Color: intPtr(-1)}, true},
+		{"couleur au-delà d'un octet", drawRequest{X: intPtr(1), Y: intPtr(1), Color: intPtr(256)}, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -40,22 +42,54 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-// do envoie une requête au handler sans réseau et renvoie la réponse.
+func TestBearerToken(t *testing.T) {
+	tests := []struct{ name, header, want string }{
+		{"valide", "Bearer abc", "abc"},
+		{"sans préfixe", "abc", ""},
+		{"vide", "", ""},
+		{"autre schéma", "Basic abc", ""},
+		{"préfixe seul", "Bearer ", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := bearerToken(tc.header); got != tc.want {
+				t.Errorf("bearerToken(%q) = %q, attendu %q", tc.header, got, tc.want)
+			}
+		})
+	}
+}
+
+// do envoie une requête authentifiée au handler, sans réseau, et renvoie la réponse.
 func do(method, body, correlationID string) *httptest.ResponseRecorder {
+	return doAs(method, body, correlationID, "Bearer jeton")
+}
+
+// doAs permet de choisir l'en-tête que la gateway aurait transmis ("" = aucun).
+func doAs(method, body, correlationID, authorization string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, "/", strings.NewReader(body))
 	if correlationID != "" {
 		req.Header.Set("X-Correlation-Id", correlationID)
+	}
+	if authorization != "" {
+		req.Header.Set("X-Forwarded-Authorization", authorization)
 	}
 	rec := httptest.NewRecorder()
 	handle(rec, req)
 	return rec
 }
 
-const validBody = `{"x":10,"y":20,"color":"#ff0000","user_id":"u1"}`
+const validBody = `{"x":10,"y":20,"color":2}`
+
+// utilisateurConnecte simule Discord : le jeton appartient à l'utilisateur u42.
+func utilisateurConnecte(t *testing.T) {
+	t.Helper()
+	fauxDiscord(t, http.StatusOK, `{"id":"u42"}`)
+}
 
 func TestHandle(t *testing.T) {
+	utilisateurConnecte(t)
 	published := 0
-	publish = func(ctx context.Context, req drawRequest, eventID, correlationID string) error {
+	publish = func(ctx context.Context, evt drawEvent, eventID, correlationID string) error {
 		published++
 		return nil
 	}
@@ -71,8 +105,8 @@ func TestHandle(t *testing.T) {
 		{"valide", http.MethodPost, validBody, http.StatusAccepted, 1},
 		{"GET refusé", http.MethodGet, "", http.StatusMethodNotAllowed, 0},
 		{"JSON invalide", http.MethodPost, `{pas du json`, http.StatusBadRequest, 0},
-		{"hors grille", http.MethodPost, `{"x":99999,"y":0,"color":"#ff0000","user_id":"u1"}`, http.StatusBadRequest, 0},
-		{"x absent", http.MethodPost, `{"y":0,"color":"#ff0000","user_id":"u1"}`, http.StatusBadRequest, 0},
+		{"hors grille", http.MethodPost, `{"x":99999,"y":0,"color":2}`, http.StatusBadRequest, 0},
+		{"x absent", http.MethodPost, `{"y":0,"color":2}`, http.StatusBadRequest, 0},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -88,9 +122,82 @@ func TestHandle(t *testing.T) {
 	}
 }
 
+// Sans identité vérifiée par Discord, rien ne doit être publié : le statut dit pourquoi.
+func TestAuthentification(t *testing.T) {
+	tests := []struct {
+		name          string
+		authorization string
+		discordStatus int
+		wantStatus    int
+		wantDiscord   bool // Discord doit-il avoir été interrogé ?
+	}{
+		{"sans jeton", "", http.StatusOK, http.StatusUnauthorized, false},
+		{"jeton mal formé", "Basic abc", http.StatusOK, http.StatusUnauthorized, false},
+		{"jeton refusé par Discord", "Bearer faux", http.StatusUnauthorized, http.StatusUnauthorized, true},
+		{"Discord en panne", "Bearer ok", http.StatusInternalServerError, http.StatusServiceUnavailable, true},
+		{"jeton valide", "Bearer ok", http.StatusOK, http.StatusAccepted, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			recu := fauxDiscord(t, tc.discordStatus, `{"id":"u42"}`)
+			published := 0
+			publish = func(ctx context.Context, evt drawEvent, eventID, correlationID string) error {
+				published++
+				return nil
+			}
+			t.Cleanup(func() { publish = publishDraw })
+
+			rec := doAs(http.MethodPost, validBody, "", tc.authorization)
+
+			if rec.Code != tc.wantStatus {
+				t.Errorf("statut = %d, attendu %d (corps : %s)", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+			if interroge := recu.URL != nil; interroge != tc.wantDiscord {
+				t.Errorf("Discord interrogé = %v, attendu %v", interroge, tc.wantDiscord)
+			}
+			if tc.wantStatus != http.StatusAccepted && published != 0 {
+				t.Errorf("publications = %d : rien ne doit être publié sans authentification", published)
+			}
+		})
+	}
+}
+
+// Le test le plus important : on ne peut pas dessiner au nom d'un autre.
+func TestUserIDVientDeDiscord(t *testing.T) {
+	utilisateurConnecte(t) // le jeton appartient à u42
+
+	var got drawEvent
+	publish = func(ctx context.Context, evt drawEvent, eventID, correlationID string) error {
+		got = evt
+		return nil
+	}
+	t.Cleanup(func() { publish = publishDraw })
+
+	body := `{"x":10,"y":20,"color":2,"user_id":"imposteur"}`
+	if rec := do(http.MethodPost, body, ""); rec.Code != http.StatusAccepted {
+		t.Fatalf("statut = %d, attendu 202", rec.Code)
+	}
+	if got.UserID != "u42" {
+		t.Errorf("user_id publié = %q, attendu u42 (celui de Discord, pas celui du corps)", got.UserID)
+	}
+}
+
+// Le message est le contrat avec le worker : ses champs ne doivent pas changer sans prévenir.
+func TestContratDuMessage(t *testing.T) {
+	data, err := json.Marshal(drawEvent{X: 10, Y: 20, Color: 2, UserID: "u42"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"x":10,"y":20,"color":2,"user_id":"u42"}`
+	if string(data) != want {
+		t.Errorf("message = %s, attendu %s", data, want)
+	}
+}
+
 func TestCorrelationIDPropage(t *testing.T) {
+	utilisateurConnecte(t)
 	var got string
-	publish = func(ctx context.Context, req drawRequest, eventID, correlationID string) error {
+	publish = func(ctx context.Context, evt drawEvent, eventID, correlationID string) error {
 		got = correlationID
 		return nil
 	}
@@ -106,7 +213,8 @@ func TestCorrelationIDPropage(t *testing.T) {
 }
 
 func TestCorrelationIDGenere(t *testing.T) {
-	publish = func(ctx context.Context, req drawRequest, eventID, correlationID string) error { return nil }
+	utilisateurConnecte(t)
+	publish = func(ctx context.Context, evt drawEvent, eventID, correlationID string) error { return nil }
 	t.Cleanup(func() { publish = publishDraw })
 
 	rec := do(http.MethodPost, validBody, "")
@@ -116,7 +224,8 @@ func TestCorrelationIDGenere(t *testing.T) {
 }
 
 func TestEchecPublication(t *testing.T) {
-	publish = func(ctx context.Context, req drawRequest, eventID, correlationID string) error {
+	utilisateurConnecte(t)
+	publish = func(ctx context.Context, evt drawEvent, eventID, correlationID string) error {
 		return errors.New("pubsub injoignable")
 	}
 	t.Cleanup(func() { publish = publishDraw })

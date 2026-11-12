@@ -9,3 +9,9 @@ variable "region" {
   type        = string
   description = "Project deployed"
 }
+
+variable "cors_allowed_origins" {
+  description = "Adresses des fronts autorisées à appeler /draw depuis un navigateur (liste vide = CORS fermé)"
+  type        = list(string)
+  default     = []
+}

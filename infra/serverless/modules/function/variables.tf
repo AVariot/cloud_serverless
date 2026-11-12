@@ -48,8 +48,26 @@ variable "timeout_seconds" {
   default     = 60
 }
 
+variable "min_instances" {
+  description = "Instances gardées chaudes en permanence (0 = la fonction peut s'éteindre : démarrage à froid au prochain appel)"
+  type        = number
+  default     = 0
+}
+
 variable "env" {
   description = "Variables d'environnement de la fonction"
+  type        = map(string)
+  default     = {}
+}
+
+variable "wait_for" {
+  description = "Ressources à créer avant la fonction (ex. droit de lire un secret) : évite l'échec du premier déploiement"
+  type        = any
+  default     = []
+}
+
+variable "secret_env" {
+  description = "Secrets exposés en variables d'environnement : nom de la variable => secret_id dans Secret Manager"
   type        = map(string)
   default     = {}
 }

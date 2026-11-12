@@ -1,0 +1,20 @@
+{
+  "colors": [
+    { "id": 1, "name": "Blanc", "hex": "#FFFFFF" },
+    { "id": 2, "name": "Gris clair", "hex": "#E4E4E4" },
+    { "id": 3, "name": "Gris", "hex": "#888888" },
+    { "id": 4, "name": "Noir", "hex": "#222222" },
+    { "id": 5, "name": "Rose", "hex": "#FFA7D1" },
+    { "id": 6, "name": "Rouge", "hex": "#E50000" },
+    { "id": 7, "name": "Orange", "hex": "#E59500" },
+    { "id": 8, "name": "Marron", "hex": "#A06A42" },
+    { "id": 9, "name": "Jaune", "hex": "#E5D900" },
+    { "id": 10, "name": "Vert clair", "hex": "#94E044" },
+    { "id": 11, "name": "Vert", "hex": "#02BE01" },
+    { "id": 12, "name": "Cyan", "hex": "#00D3DD" },
+    { "id": 13, "name": "Bleu", "hex": "#0083C7" },
+    { "id": 14, "name": "Bleu foncé", "hex": "#0000EA" },
+    { "id": 15, "name": "Violet", "hex": "#CF6EE4" },
+    { "id": 16, "name": "Violet foncé", "hex": "#820080" }
+  ]
+}
