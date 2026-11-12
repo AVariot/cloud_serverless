@@ -12,7 +12,8 @@ module "draw_pixel" {
   source_bucket = google_storage_bucket.functions_src.name
 
   env = {
-    GCP_PROJECT = var.project_id
+    GCP_PROJECT  = var.project_id
+    PALETTE_JSON = local.palette_json
   }
 
   depends_on = [google_firestore_database.main]

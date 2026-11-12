@@ -32,12 +32,22 @@ paths:
             properties:
               x: { type: integer }
               y: { type: integer }
-              color: { type: string }
+              color: { type: integer, description: "Numéro de la palette (config/palette.json), 1 et plus ; 0 = vide, non dessinable" }
       x-google-backend:
         address: ${proxy_url}
       responses:
         "202":
           description: Événement accepté
+
+    options:
+      operationId: drawPreflight
+      summary: Préflight CORS (le navigateur n'envoie ni clé API ni jeton sur cette requête)
+      security: []
+      x-google-backend:
+        address: ${proxy_url}
+      responses:
+        "204":
+          description: Origine autorisée
 
   /discord:
     post:

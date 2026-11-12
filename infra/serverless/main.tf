@@ -1,5 +1,11 @@
 # main.tf
 
+# Palette commune au back et au front (config/palette.json). Les fonctions la reçoivent en variable
+# d'environnement : une seule source de vérité, et changer la palette redéploie les fonctions concernées.
+locals {
+  palette_json = jsonencode(jsondecode(file("${path.module}/../../config/palette.json")))
+}
+
 resource "google_storage_bucket" "functions_src" {
   name                        = "${var.project_id}-functions-src"
   location                    = var.region
@@ -20,6 +26,7 @@ module "discord_proxy" {
     GCP_PROJECT        = var.project_id
     TOPIC_NAME         = google_pubsub_topic.pixel_events.name
     DISCORD_TOPIC_NAME = google_pubsub_topic.discord_command.name
+    PALETTE_JSON       = local.palette_json
   }
 
   # Clé publique Discord : lue dans Secret Manager, jamais écrite dans le code ni dans le state
@@ -47,6 +54,11 @@ module "proxy" {
   env = {
     GCP_PROJECT = var.project_id
     TOPIC_NAME  = google_pubsub_topic.pixel_events.name
+
+    # Origines des fronts autorisées par CORS (jamais "*")
+    ALLOWED_ORIGINS = join(",", var.cors_allowed_origins)
+
+    PALETTE_JSON = local.palette_json
   }
 }
 
