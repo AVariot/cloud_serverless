@@ -1,34 +1,43 @@
-   name: Terraform Deploy
+name: Terraform Deploy
 
-   on:
-     push:
-       tags: ['v*']
+on:
+  push:
+    tags: ["v*"]
 
-   permissions:
-     contents: read
-     id-token: write
+permissions:
+  contents: read
+  id-token: write
 
-   concurrency:
-     group: terraform-deploy
-     cancel-in-progress: false
+jobs:
+  deploy-dev:
+    name: foundation (dev)
+    runs-on: ubuntu-latest
+    environment: dev
+    # shared with the destroy workflow: never apply and destroy dev at the same time
+    concurrency:
+      group: terraform-dev
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: infra/foundation
+    steps:
+      - uses: actions/checkout@v4
 
-   jobs:
-     deploy:
-       runs-on: ubuntu-latest
-       strategy:
-         max-parallel: 1
-         matrix:
-           env: [dev, prd]
-       environment: ${{ matrix.env }}
-       defaults:
-         run:
-           working-directory: infra/foundation
-       steps:
-         - uses: actions/checkout@v4
-         - uses: hashicorp/setup-terraform@v3
-         - uses: google-github-actions/auth@v2
-           with:
-             workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-             service_account: ${{ vars.DEPLOYER_SA }}
-         - run: terraform init -input=false -backend-config=backends/${{ matrix.env }}.hcl
-         - run: terraform apply -input=false -auto-approve -var-file=${{ matrix.env }}.tfvars
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init
+        run: terraform init -input=false -backend-config=backends/dev.hcl
+
+      - name: Plan
+        run: terraform plan -input=false -var-file=dev.tfvars -out=tfplan
+
+      # applies exactly the plan printed above
+      - name: Apply
+        run: terraform apply -input=false tfplan
+
+  # deploy-prd comes with the prd environment (needs: deploy-dev, environment: prd)
