@@ -1,3 +1,5 @@
-project_id  = "servtkt-cloudnative-dev"
-region      = "europe-west1"
-github_repo = "Cloud-Orga/cloud_serverless"
+project_id   = "servtkt-cloudnative-dev"
+region       = "europe-west1"
+github_repo  = "Cloud-Orga/cloud_serverless"
+state_bucket = "servtkt-cloudnative-dev-tfstate-eu"
+admin_member = "user:alexisvariot418@gmail.com"
