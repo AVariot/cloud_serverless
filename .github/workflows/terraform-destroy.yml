@@ -1,0 +1,50 @@
+name: Terraform Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment to destroy"
+        type: choice
+        options: [dev]
+        required: true
+        default: dev
+      confirm:
+        description: "Type the environment name again to confirm"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  destroy:
+    name: foundation (${{ inputs.env }})
+    # skipped unless the confirmation matches the chosen environment
+    if: inputs.confirm == inputs.env
+    # always GitHub-hosted: a self-hosted runner would be deleted along with the cluster
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    # shared with the deploy workflow: never apply and destroy the same environment at the same time
+    concurrency:
+      group: terraform-${{ inputs.env }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: infra/foundation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init
+        run: terraform init -input=false -backend-config=backends/${{ inputs.env }}.hcl
+
+      - name: Destroy
+        run: terraform destroy -input=false -auto-approve -var-file=${{ inputs.env }}.tfvars

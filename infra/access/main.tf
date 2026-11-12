@@ -68,9 +68,58 @@ resource "google_project_iam_member" "github_deployer_pubsub" {
   member  = google_service_account.github_deployer.member
 }
 
+# GKE : la CI doit pouvoir créer le cluster et ses node pools
+resource "google_project_iam_member" "github_deployer_container" {
+  project = var.project_id
+  role    = "roles/container.admin"
+  member  = google_service_account.github_deployer.member
+}
+
+# GKE : attacher un compte de service aux nodes du cluster
+resource "google_project_iam_member" "github_deployer_sa_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = google_service_account.github_deployer.member
+}
+
+# Activation des APIs (container.googleapis.com, ...) depuis Terraform
+resource "google_project_iam_member" "github_deployer_service_usage" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
+  member  = google_service_account.github_deployer.member
+}
+
 # Pub/Sub : mon compte, pour lire et poser les droits IAM des topics
 resource "google_project_iam_member" "alexis_pubsub" {
   project = var.project_id
   role    = "roles/pubsub.admin"
+  member  = "user:alexisvariot418@gmail.com"
+}
+
+# Secret Manager : la CI doit pouvoir créer les secrets et poser leurs droits d'accès
+resource "google_project_iam_member" "github_deployer_secretmanager" {
+  project = var.project_id
+  role    = "roles/secretmanager.admin"
+  member  = google_service_account.github_deployer.member
+}
+
+# Secret Manager : mon compte, pour poser les droits d'accès des secrets (editor ne le permet pas)
+resource "google_project_iam_member" "alexis_secretmanager" {
+  project = var.project_id
+  role    = "roles/secretmanager.admin"
+  member  = "user:alexisvariot418@gmail.com"
+}
+
+# Firestore : la CI doit pouvoir créer la base (editor ne le permet pas)
+resource "google_project_iam_member" "github_deployer_datastore" {
+  project = var.project_id
+  role    = "roles/datastore.owner"
+  member  = google_service_account.github_deployer.member
+}
+
+# Firestore : mon compte, pour créer la base en local (editor ne le permet pas)
+resource "google_project_iam_member" "alexis_datastore" {
+  project = var.project_id
+  role    = "roles/datastore.owner"
   member  = "user:alexisvariot418@gmail.com"
 }
