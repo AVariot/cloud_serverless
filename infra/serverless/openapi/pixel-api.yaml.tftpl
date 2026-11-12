@@ -49,6 +49,39 @@ paths:
         "204":
           description: Origine autorisée
 
+  /pixel:
+    get:
+      operationId: getPixel
+      summary: "Contenu d'un pixel (case vide : 200 avec empty = true)"
+      parameters:
+        - name: x
+          in: query
+          required: true
+          type: integer
+          minimum: 0
+          maximum: 9999
+        - name: y
+          in: query
+          required: true
+          type: integer
+          minimum: 0
+          maximum: 9999
+      x-google-backend:
+        address: ${get_pixel_url}
+      responses:
+        "200":
+          description: Pixel (color 0 = vide)
+
+    options:
+      operationId: getPixelPreflight
+      summary: Préflight CORS (X-Api-Key déclenche un préflight sans clé)
+      security: []
+      x-google-backend:
+        address: ${get_pixel_url}
+      responses:
+        "204":
+          description: Origine autorisée
+
   /discord:
     post:
       operationId: discord

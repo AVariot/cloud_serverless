@@ -62,6 +62,33 @@ module "proxy" {
   }
 }
 
+# Lecture d'un pixel : GET /pixel?x=&y= (lecture seule de Firestore)
+module "get_pixel" {
+  source = "./modules/function"
+
+  project_id    = var.project_id
+  region        = var.region
+  name          = "get-pixel"
+  entry_point   = "GetPixel"
+  source_dir    = "${path.module}/../../app/functions/get_pixel"
+  source_bucket = google_storage_bucket.functions_src.name
+
+  env = {
+    GCP_PROJECT     = var.project_id
+    ALLOWED_ORIGINS = join(",", var.cors_allowed_origins)
+    PALETTE_JSON    = local.palette_json
+  }
+
+  depends_on = [google_firestore_database.main]
+}
+
+# Lecture seule : cette fonction ne peut rien écrire dans Firestore
+resource "google_project_iam_member" "get_pixel_datastore" {
+  project = var.project_id
+  role    = "roles/datastore.viewer"
+  member  = module.get_pixel.service_account_member
+}
+
 resource "google_pubsub_topic_iam_member" "proxy_publisher" {
   topic  = google_pubsub_topic.pixel_events.id
   role   = "roles/pubsub.publisher"
@@ -113,6 +140,15 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_invokes_discord_proxy
   member   = google_service_account.gateway.member
 }
 
+# Gateway invoke la lecture d'un pixel
+resource "google_cloud_run_v2_service_iam_member" "gateway_invokes_get_pixel" {
+  project  = var.project_id
+  location = var.region
+  name     = module.get_pixel.name
+  role     = "roles/run.invoker"
+  member   = google_service_account.gateway.member
+}
+
 # Api
 resource "google_api_gateway_api" "pixel" {
   provider = google-beta
@@ -131,6 +167,7 @@ resource "google_api_gateway_api_config" "pixel" {
       contents = base64encode(templatefile("${path.module}/openapi/pixel-api.yaml.tftpl", {
         proxy_url         = module.proxy.uri
         discord_proxy_url = module.discord_proxy.uri
+        get_pixel_url     = module.get_pixel.uri
       }))
     }
   }
