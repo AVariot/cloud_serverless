@@ -77,6 +77,21 @@ for arg in "$@"; do
   esac
 done
 
+# --- Couleurs : la liste des choix de /draw vient de config/palette.json (numéro -> nom) -------------
+# Le back et le front partagent ce fichier : changer la palette change aussi la commande Discord.
+PALETTE_FILE="${PALETTE_FILE:-$(dirname "$0")/../config/palette.json}"
+command -v jq >/dev/null || die "jq est requis (il lit $PALETTE_FILE)"
+[ -f "$PALETTE_FILE" ] || die "palette introuvable : $PALETTE_FILE"
+choices="$(jq -c '[.colors[] | {name: .name, value: .id}]' "$PALETTE_FILE")" || die "palette illisible : $PALETTE_FILE"
+count="$(jq 'length' <<<"$choices")"
+{ [ "$count" -ge 1 ] && [ "$count" -le 25 ]; } || die "Discord accepte 1 à 25 choix par option ($count couleurs dans la palette)"
+COMMANDS="$(jq -c --argjson choices "$choices" '
+  map(if .name == "draw"
+      then .options |= map(if .name == "color"
+          then .type = 4 | .description = "Couleur de la palette" | del(.min_length, .max_length) | .choices = $choices
+          else . end)
+      else . end)' <<<"$COMMANDS")"
+
 if [ "$DRY_RUN" = 1 ]; then
   printf '%s\n' "$COMMANDS"
   exit 0
