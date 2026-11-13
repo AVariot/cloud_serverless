@@ -37,7 +37,7 @@ jobs:
       max-parallel: 1
       fail-fast: true
       matrix:
-        stack: [foundation, serverless]
+        stack: [foundation, serverless, frontend]
     # shared with the destroy workflow: never apply and destroy dev at the same time
     concurrency:
       group: terraform-dev
@@ -65,17 +65,26 @@ jobs:
       - name: Apply
         run: terraform apply -input=false tfplan
 
+  # le site est construit avec les adresses de la gateway et du front : il part après les stacks de son environnement
+  site-dev:
+    name: site (dev)
+    needs: deploy-dev
+    uses: ./.github/workflows/deploy-site.yml
+    with:
+      env: dev
+
   # prd : seulement après le déploiement de dev, et après l'approbation des relecteurs de l'environnement prd
   deploy-prd:
     name: ${{ matrix.stack }} (prd)
-    needs: deploy-dev
+    # prd ne démarre que si tout dev, site compris, a réussi
+    needs: [deploy-dev, site-dev]
     runs-on: ubuntu-latest
     environment: prd
     strategy:
       max-parallel: 1
       fail-fast: true
       matrix:
-        stack: [foundation, serverless]
+        stack: [foundation, serverless, frontend]
     concurrency:
       group: terraform-prd
       cancel-in-progress: false
@@ -101,3 +110,10 @@ jobs:
       # applies exactly the plan printed above
       - name: Apply
         run: terraform apply -input=false tfplan
+
+  site-prd:
+    name: site (prd)
+    needs: deploy-prd
+    uses: ./.github/workflows/deploy-site.yml
+    with:
+      env: prd

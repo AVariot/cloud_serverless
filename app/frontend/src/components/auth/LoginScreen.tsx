@@ -3,8 +3,6 @@ import { useAuthStore } from '../../auth/store';
 import { PALETTE } from '../../palette';
 import { DiscordIcon } from '../icons/DiscordIcon';
 
-const NNBSP = '\u202F';
-
 /** Small mosaic of the palette colors, used as the logo */
 function PaletteMark() {
     return (

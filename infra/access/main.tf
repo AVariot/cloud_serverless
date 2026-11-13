@@ -134,6 +134,15 @@ resource "google_project_iam_member" "alexis_datastore" {
   depends_on = [google_project_service.bootstrap]
 }
 
+# Firebase : mon compte, pour créer le projet Firebase et le site Hosting en local (editor ne le permet pas)
+resource "google_project_iam_member" "alexis_firebase" {
+  project = var.project_id
+  role    = "roles/firebase.admin"
+  member  = var.admin_member
+
+  depends_on = [google_project_service.bootstrap]
+}
+
 # Stack serverless déployée par la CI : un rôle par famille de ressources qu'elle crée.
 # Attention : roles/resourcemanager.projectIamAdmin permet de se donner n'importe quel autre rôle du projet.
 # C'est le prix de « la CI applique les droits IAM des fonctions » ; à resserrer si la stack n'a plus à poser d'IAM.
@@ -145,6 +154,7 @@ locals {
     "roles/serviceusage.apiKeysAdmin",       # clé API
     "roles/firebaserules.admin",             # règles Firestore
     "roles/storage.admin",                   # bucket des sources des fonctions
+    "roles/firebase.admin",                  # projet Firebase et site Hosting (stack frontend, et envoi du site)
     "roles/iam.serviceAccountAdmin",         # un compte de service par fonction
     "roles/resourcemanager.projectIamAdmin", # rôles des comptes de service
   ])

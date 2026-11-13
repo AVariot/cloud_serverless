@@ -65,6 +65,10 @@ module "proxy" {
     PALETTE_JSON = local.palette_json
   }
 
+  # Une instance reste chaude : le premier dessin d'un utilisateur ne paie pas un démarrage à froid.
+  # Coût : une instance facturée en continu par environnement (comme discord-proxy).
+  min_instances = 1
+
   # les API (Cloud Run, Cloud Functions, Cloud Build) doivent être actives avant la première fonction
   wait_for = values(google_project_service.apis)
 }

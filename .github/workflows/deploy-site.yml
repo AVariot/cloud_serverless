@@ -1,0 +1,54 @@
+name: Deploy site
+
+# Construit le front pour un environnement et l'envoie sur Firebase Hosting.
+# Appelé par terraform-deploy.yml, une fois les stacks serverless et frontend appliquées.
+# La logique (lecture des sorties Terraform, construction, envoi) est dans scripts/deploy_site.sh.
+# Seule variable à fournir : DISCORD_CLIENT_ID, identifiant public de l'application Discord (variable de l'environnement).
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: "Environment to deploy (dev or prd)"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  site:
+    name: site (${{ inputs.env }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    # le même verrou que les stacks de l'environnement : jamais deux opérations en même temps
+    concurrency:
+      group: terraform-${{ inputs.env }}
+      cancel-in-progress: false
+    env:
+      ENVIRONMENT: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false # la sortie de « terraform output -raw » doit rester brute
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+
+      # Toute la logique est dans scripts/deploy_site.sh : c'est le même script qu'on lance à la main,
+      # donc ce qui marche en local est ce que fait la release.
+      - name: Build and deploy the site
+        env:
+          DISCORD_CLIENT_ID: ${{ vars.DISCORD_CLIENT_ID }}
+        run: ./scripts/deploy_site.sh "$ENVIRONMENT"
