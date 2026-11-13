@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stack: [access, foundation]
+        stack: [access, foundation, serverless]
         env: [dev, prd]
     # gives the job the environment's variables (WIF_PROVIDER, DEPLOYER_SA)
     environment: ${{ matrix.env }}

@@ -16,6 +16,7 @@ module "draw_pixel" {
     PALETTE_JSON = local.palette_json
   }
 
+  wait_for   = values(google_project_service.apis)
   depends_on = [google_firestore_database.main]
 }
 
@@ -63,6 +64,7 @@ module "admin_cmd" {
     GCP_PROJECT = var.project_id
   }
 
+  wait_for   = values(google_project_service.apis)
   depends_on = [google_firestore_database.main]
 }
 
