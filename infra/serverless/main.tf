@@ -38,7 +38,11 @@ module "discord_proxy" {
   min_instances = 1
 
   # La fonction démarre seulement quand elle a le droit de lire ce secret
-  wait_for = [google_secret_manager_secret_iam_member.proxy_discord_public_key]
+  wait_for = concat(
+    [google_secret_manager_secret_iam_member.proxy_discord_public_key],
+    google_secret_manager_secret_version.discord_public_key[*],
+    values(google_project_service.apis),
+  )
 }
 
 module "proxy" {
@@ -60,6 +64,9 @@ module "proxy" {
 
     PALETTE_JSON = local.palette_json
   }
+
+  # les API (Cloud Run, Cloud Functions, Cloud Build) doivent être actives avant la première fonction
+  wait_for = values(google_project_service.apis)
 }
 
 # Lecture d'un pixel : GET /pixel?x=&y= (lecture seule de Firestore)
@@ -79,6 +86,7 @@ module "get_pixel" {
     PALETTE_JSON    = local.palette_json
   }
 
+  wait_for   = values(google_project_service.apis)
   depends_on = [google_firestore_database.main]
 }
 
@@ -153,6 +161,8 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_invokes_get_pixel" {
 resource "google_api_gateway_api" "pixel" {
   provider = google-beta
   api_id   = "pixel-api"
+
+  depends_on = [google_project_service.apis]
 }
 
 # Api Gateway Config
@@ -195,6 +205,10 @@ resource "google_api_gateway_gateway" "pixel" {
 resource "google_project_service" "pixel_api" {
   service            = google_api_gateway_api.pixel.managed_service
   disable_on_destroy = false
+
+  # Le service géré n'a pas de configuration tant qu'aucune config d'API n'existe : l'activer avant échoue
+  # (403 SERVICE_CONFIG_NOT_FOUND, vu sur un projet neuf). On attend donc la première config.
+  depends_on = [google_api_gateway_api_config.pixel]
 }
 
 # Clé API restreinte à cette API uniquement
@@ -208,5 +222,5 @@ resource "google_apikeys_key" "pixel" {
     }
   }
 
-  depends_on = [google_project_service.pixel_api]
+  depends_on = [google_project_service.pixel_api, google_project_service.apis]
 }

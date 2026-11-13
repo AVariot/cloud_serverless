@@ -27,17 +27,24 @@ jobs:
           fi
 
   deploy-dev:
-    name: foundation (dev)
+    name: ${{ matrix.stack }} (dev)
     needs: verify-main
     runs-on: ubuntu-latest
     environment: dev
+    # one stack at a time, in this order: the network before the application
+    # (access is not here: it holds the deployer's own rights, applied by hand)
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        stack: [foundation, serverless]
     # shared with the destroy workflow: never apply and destroy dev at the same time
     concurrency:
       group: terraform-dev
       cancel-in-progress: false
     defaults:
       run:
-        working-directory: infra/foundation
+        working-directory: infra/${{ matrix.stack }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,16 +67,21 @@ jobs:
 
   # prd : seulement après le déploiement de dev, et après l'approbation des relecteurs de l'environnement prd
   deploy-prd:
-    name: foundation (prd)
+    name: ${{ matrix.stack }} (prd)
     needs: deploy-dev
     runs-on: ubuntu-latest
     environment: prd
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        stack: [foundation, serverless]
     concurrency:
       group: terraform-prd
       cancel-in-progress: false
     defaults:
       run:
-        working-directory: infra/foundation
+        working-directory: infra/${{ matrix.stack }}
     steps:
       - uses: actions/checkout@v4
 

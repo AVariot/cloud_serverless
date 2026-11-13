@@ -3,6 +3,8 @@
 resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = "github"
   display_name              = "GitHub Actions"
+
+  depends_on = [google_project_service.bootstrap]
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
@@ -24,6 +26,8 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 resource "google_service_account" "github_deployer" {
   account_id   = "github-deployer"
   display_name = "Déploiement depuis GitHub Actions"
+
+  depends_on = [google_project_service.bootstrap]
 }
 
 resource "google_service_account_iam_member" "github_deployer_wif" {
@@ -94,6 +98,8 @@ resource "google_project_iam_member" "alexis_pubsub" {
   project = var.project_id
   role    = "roles/pubsub.admin"
   member  = var.admin_member
+
+  depends_on = [google_project_service.bootstrap]
 }
 
 # Secret Manager : la CI doit pouvoir créer les secrets et poser leurs droits d'accès
@@ -108,6 +114,8 @@ resource "google_project_iam_member" "alexis_secretmanager" {
   project = var.project_id
   role    = "roles/secretmanager.admin"
   member  = var.admin_member
+
+  depends_on = [google_project_service.bootstrap]
 }
 
 # Firestore : la CI doit pouvoir créer la base (editor ne le permet pas)
@@ -122,4 +130,30 @@ resource "google_project_iam_member" "alexis_datastore" {
   project = var.project_id
   role    = "roles/datastore.owner"
   member  = var.admin_member
+
+  depends_on = [google_project_service.bootstrap]
+}
+
+# Stack serverless déployée par la CI : un rôle par famille de ressources qu'elle crée.
+# Attention : roles/resourcemanager.projectIamAdmin permet de se donner n'importe quel autre rôle du projet.
+# C'est le prix de « la CI applique les droits IAM des fonctions » ; à resserrer si la stack n'a plus à poser d'IAM.
+locals {
+  github_deployer_serverless_roles = toset([
+    "roles/run.admin",                       # services Cloud Run des fonctions et leurs droits d'appel
+    "roles/cloudfunctions.admin",            # fonctions gen2
+    "roles/apigateway.admin",                # API, config et gateway
+    "roles/serviceusage.apiKeysAdmin",       # clé API
+    "roles/firebaserules.admin",             # règles Firestore
+    "roles/storage.admin",                   # bucket des sources des fonctions
+    "roles/iam.serviceAccountAdmin",         # un compte de service par fonction
+    "roles/resourcemanager.projectIamAdmin", # rôles des comptes de service
+  ])
+}
+
+resource "google_project_iam_member" "github_deployer_serverless" {
+  for_each = local.github_deployer_serverless_roles
+
+  project = var.project_id
+  role    = each.value
+  member  = google_service_account.github_deployer.member
 }
