@@ -14,3 +14,13 @@ variable "github_repo" {
   type        = string
   description = "Project deployed"
 }
+
+variable "state_bucket" {
+  type        = string
+  description = "Bucket name"
+}
+
+variable "admin_member" {
+  type        = string
+  description = "Admin email"
+}
