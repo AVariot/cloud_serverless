@@ -34,7 +34,7 @@ resource "google_service_account_iam_member" "github_deployer_wif" {
 
 # Accès au state : sur le bucket uniquement
 resource "google_storage_bucket_iam_member" "github_deployer_state" {
-  bucket = "servtkt-cloudnative-dev-tfstate-eu"
+  bucket = var.state_bucket
   role   = "roles/storage.objectAdmin"
   member = google_service_account.github_deployer.member
 }
@@ -93,7 +93,7 @@ resource "google_project_iam_member" "github_deployer_service_usage" {
 resource "google_project_iam_member" "alexis_pubsub" {
   project = var.project_id
   role    = "roles/pubsub.admin"
-  member  = "user:alexisvariot418@gmail.com"
+  member  = var.admin_member
 }
 
 # Secret Manager : la CI doit pouvoir créer les secrets et poser leurs droits d'accès
@@ -107,7 +107,7 @@ resource "google_project_iam_member" "github_deployer_secretmanager" {
 resource "google_project_iam_member" "alexis_secretmanager" {
   project = var.project_id
   role    = "roles/secretmanager.admin"
-  member  = "user:alexisvariot418@gmail.com"
+  member  = var.admin_member
 }
 
 # Firestore : la CI doit pouvoir créer la base (editor ne le permet pas)
@@ -121,5 +121,5 @@ resource "google_project_iam_member" "github_deployer_datastore" {
 resource "google_project_iam_member" "alexis_datastore" {
   project = var.project_id
   role    = "roles/datastore.owner"
-  member  = "user:alexisvariot418@gmail.com"
+  member  = var.admin_member
 }
