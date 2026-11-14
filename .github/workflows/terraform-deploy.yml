@@ -1,34 +1,103 @@
-   name: Terraform Deploy
+name: Terraform Deploy
 
-   on:
-     push:
-       tags: ['v*']
+on:
+  push:
+    tags: ["v*"]
 
-   permissions:
-     contents: read
-     id-token: write
+permissions:
+  contents: read
+  id-token: write
 
-   concurrency:
-     group: terraform-deploy
-     cancel-in-progress: false
+jobs:
+  # un tag ne déploie que s'il pointe un commit de main : un tag posé sur une autre branche est refusé
+  verify-main:
+    name: tag on main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-   jobs:
-     deploy:
-       runs-on: ubuntu-latest
-       strategy:
-         max-parallel: 1
-         matrix:
-           env: [dev, prd]
-       environment: ${{ matrix.env }}
-       defaults:
-         run:
-           working-directory: infra/foundation
-       steps:
-         - uses: actions/checkout@v4
-         - uses: hashicorp/setup-terraform@v3
-         - uses: google-github-actions/auth@v2
-           with:
-             workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-             service_account: ${{ vars.DEPLOYER_SA }}
-         - run: terraform init -input=false -backend-config=backends/${{ matrix.env }}.hcl
-         - run: terraform apply -input=false -auto-approve -var-file=${{ matrix.env }}.tfvars
+      - name: Check the tagged commit is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::tag $GITHUB_REF_NAME ($GITHUB_SHA) is not on main: no deployment"
+            exit 1
+          fi
+
+  deploy-dev:
+    name: ${{ matrix.stack }} (dev)
+    needs: verify-main
+    runs-on: ubuntu-latest
+    environment: dev
+    # one stack at a time, in this order: the network before the application
+    # (access is not here: it holds the deployer's own rights, applied by hand)
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        stack: [foundation, serverless]
+    # shared with the destroy workflow: never apply and destroy dev at the same time
+    concurrency:
+      group: terraform-dev
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init
+        run: terraform init -input=false -backend-config=backends/dev.hcl
+
+      - name: Plan
+        run: terraform plan -input=false -var-file=dev.tfvars -out=tfplan
+
+      # applies exactly the plan printed above
+      - name: Apply
+        run: terraform apply -input=false tfplan
+
+  # prd : seulement après le déploiement de dev, et après l'approbation des relecteurs de l'environnement prd
+  deploy-prd:
+    name: ${{ matrix.stack }} (prd)
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: prd
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        stack: [foundation, serverless]
+    concurrency:
+      group: terraform-prd
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOYER_SA }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Init
+        run: terraform init -input=false -backend-config=backends/prd.hcl
+
+      - name: Plan
+        run: terraform plan -input=false -var-file=prd.tfvars -out=tfplan
+
+      # applies exactly the plan printed above
+      - name: Apply
+        run: terraform apply -input=false tfplan

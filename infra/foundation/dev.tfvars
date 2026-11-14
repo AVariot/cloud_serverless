@@ -1,0 +1,11 @@
+project_id = "servtkt-cloudnative-dev"
+region     = "europe-west1"
+vpc_name   = "servtkt-dev-vpc"
+cidr_block = "10.0.0.0/16"
+
+zone                 = "europe-west1-b"
+pods_cidr            = "10.10.0.0/16"
+services_cidr        = "10.20.0.0/20"
+master_cidr          = "172.16.0.0/28"
+cluster_name         = "servtkt-dev-gke"
+node_service_account = "gke-nodes@servtkt-cloudnative-dev.iam.gserviceaccount.com"

@@ -1,0 +1,102 @@
+swagger: "2.0"
+info:
+  title: pixel-api
+  version: "1.0.0"
+schemes:
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: x-api-key
+    in: header
+security:
+  - api_key: []
+
+paths:
+  /draw:
+    post:
+      operationId: draw
+      summary: Demande de dessiner un pixel (traitée de façon asynchrone)
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+            required: [x, y, color]
+            properties:
+              x: { type: integer }
+              y: { type: integer }
+              color: { type: integer, description: "Numéro de la palette (config/palette.json), 1 et plus ; 0 = vide, non dessinable" }
+      x-google-backend:
+        address: ${proxy_url}
+      responses:
+        "202":
+          description: Événement accepté
+
+    options:
+      operationId: drawPreflight
+      summary: Préflight CORS (le navigateur n'envoie ni clé API ni jeton sur cette requête)
+      security: []
+      x-google-backend:
+        address: ${proxy_url}
+      responses:
+        "204":
+          description: Origine autorisée
+
+  /pixel:
+    get:
+      operationId: getPixel
+      summary: "Contenu d'un pixel (case vide : 200 avec empty = true)"
+      parameters:
+        - name: x
+          in: query
+          required: true
+          type: integer
+          minimum: 0
+          maximum: 9999
+        - name: y
+          in: query
+          required: true
+          type: integer
+          minimum: 0
+          maximum: 9999
+      x-google-backend:
+        address: ${get_pixel_url}
+      responses:
+        "200":
+          description: Pixel (color 0 = vide)
+
+    options:
+      operationId: getPixelPreflight
+      summary: Préflight CORS (X-Api-Key déclenche un préflight sans clé)
+      security: []
+      x-google-backend:
+        address: ${get_pixel_url}
+      responses:
+        "204":
+          description: Origine autorisée
+
+  /discord:
+    post:
+      operationId: discord
+      summary: Interactions Discord (authentifiées par signature Ed25519 dans le proxy, pas par clé API)
+      # Discord ne sait pas envoyer d'x-api-key : on retire l'exigence globale pour cette route seulement
+      security: []
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            type: object
+      x-google-backend:
+        address: ${discord_proxy_url}
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "200":
+          description: Réponse à Discord (PONG ou accusé différé)

@@ -1,2 +1,2 @@
-bucket     = "servtkt-cloudnative-dev-tfstate"
-prefix     = "foundation"
+bucket = "servtkt-cloudnative-dev-tfstate-eu"
+prefix = "foundation"
